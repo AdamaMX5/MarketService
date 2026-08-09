@@ -92,6 +92,17 @@ bei `waveId` Stats-Event an den WaveService.
 | `POST` | `/internal/payment-events` | `{ sessionId, sourceId, event }` | Callback vom PaymentService (idempotent) |
 | `GET` | `/internal/products/:id` | — | Für WaveService-Verknüpfungsanzeige |
 
+## PaymentService (extern) — vom MarketService aufgerufen
+
+Implementiert unter [../PaymentService/PaymentService.md](../PaymentService/PaymentService.md).
+MarketService ist Caller mit dem Key `INTERNAL_API_KEY_MARKET_SERVICE` (dort so benannt).
+
+| Method | Endpoint | Auth | Von wo | Zweck |
+|--------|----------|------|--------|-------|
+| `POST` | `/internal/sessions` | `X-API-Key` (`PAYMENT_SERVICE_API_KEY`) | `POST /products/:id/orders` | Checkout-Session für die Order → `{ sessionId, checkoutUrl }`. Merchant-Onboarding unvollständig → `409` |
+| `POST` | `/internal/refunds` | `X-API-Key` | `POST /orders/:id/refund` | Stößt den Refund bei Stripe an → `202`; State-Wechsel auf `refunded` kommt per Callback auf `/internal/payment-events` |
+| `GET` | `/accounts/me` | Bearer JWT (**des Merchants**, durchgereicht) | `POST /products/:id/publish` | `{ onboardingState, payoutsEnabled }` — Publish-Gate; kein separater interner Endpunkt nötig, da MarketService das JWT des aufrufenden Merchants 1:1 weiterreicht |
+
 ---
 
 ## Env (zusätzlich zur Basis)
