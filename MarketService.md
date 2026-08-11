@@ -78,6 +78,7 @@ bei `waveId` Stats-Event an den WaveService.
 
 | Method | Endpoint | Body | Description |
 |--------|----------|------|-------------|
+| `GET` | `/me/products` | `?state&page&limit` | Eigene Produkte über **alle** States (anders als `GET /products`, das Fremden nur `published`/`soldout` zeigt) — für die Katalogverwaltung im Draft-Zustand |
 | `POST` | `/products` | Produkt-Felder | Anlegen als `draft` → `201` |
 | `PATCH` | `/products/:id` | änderbare Felder | `draft`: alles; `published`: nur `description`, `mediaIds`, `state→archived`. `initialStock` nach Publish unveränderlich → `400` |
 | `POST` | `/products/:id/publish` | — | `draft → published`; setzt Redis-Stock; PaymentService-Onboarding muss `complete` sein → sonst `409` |

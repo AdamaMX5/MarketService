@@ -1,11 +1,13 @@
 const express = require('express');
-const { Product } = require('../models/Product');
+const { Product, STATES } = require('../models/Product');
 const { requireAuth, requireRoles, hasRole } = require('../middleware/auth');
 const { asyncHandler, ApiError } = require('../middleware/errorHandler');
 const { validateProductCreate, validateProductPatch } = require('../lib/productValidation');
 const { getMerchantAccount } = require('../services/paymentServiceClient');
-const { initStock, remainingStock } = require('../lib/stock');
+const { initStock, remainingStock, remainingStockBatch } = require('../lib/stock');
 const { presentProduct } = require('../lib/presenters');
+const { parsePagination } = require('../lib/pagination');
+const { stringParam } = require('../lib/queryString');
 
 const router = express.Router();
 
@@ -21,6 +23,34 @@ async function loadOwnedProduct(id, user) {
   if (!isOwnerOrAdmin(user, product)) throw ApiError.forbidden('Not your product');
   return product;
 }
+
+// Unlike GET /products (public, published|soldout only), this lists every state the
+// merchant's own catalog can be in — a merchant otherwise has no way to see their own
+// drafts/archived items (the public listing's state whitelist masks them for everyone).
+router.get(
+  '/me/products',
+  requireAuth,
+  requireRoles(...MERCHANT_ROLES),
+  asyncHandler(async (req, res) => {
+    const { page, limit, skip } = parsePagination(req.query);
+    const filter = { merchantId: req.user.id };
+    const state = stringParam(req.query.state);
+    if (state) {
+      if (!STATES.includes(state)) {
+        throw ApiError.badRequest(`state must be one of: ${STATES.join(', ')}`);
+      }
+      filter.state = state;
+    }
+
+    const [products, total] = await Promise.all([
+      Product.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Product.countDocuments(filter),
+    ]);
+    const stockById = await remainingStockBatch(products.map((p) => p.id));
+    const items = products.map((p) => presentProduct(p, stockById.get(p.id)));
+    res.json({ items, page, limit, total });
+  })
+);
 
 router.post(
   '/products',
